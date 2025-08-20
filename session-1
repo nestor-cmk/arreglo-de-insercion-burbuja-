@@ -1,0 +1,42 @@
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+
+public class MiniColaboracionGit {
+    public static void main(String[] args) {
+        // Crear la carpeta session-1
+        File folder = new File("session-1");
+        if (!folder.exists()) {
+            folder.mkdir();
+            System.out.println("Carpeta 'session-1' creada.");
+        }
+
+        // Datos de los integrantes
+        String[][] integrantes = {
+            {"Cristopher Pinzón", "20", "Ingeniería de Sistemas", "5", "Ver videos de errores en computadoras", "Azul", "Sí, un perro", "Desarrollo web y videojuegos"},
+            {"Johan Balcázar", "21", "Ingeniería de Software", "6", "Leer manuales antiguos", "Verde", "No", "Apps móviles y desarrollo backend"}
+        };
+
+        // Crear los archivos .txt con la información
+        for (String[] integrante : integrantes) {
+            String nombreArchivo = integrante[0].toLowerCase().replace(" ", "_") + ".txt";
+            File file = new File(folder, nombreArchivo);
+
+            try (FileWriter writer = new FileWriter(file)) {
+                writer.write("Nombre: " + integrante[0] + "\n");
+                writer.write("Edad: " + integrante[1] + "\n");
+                writer.write("Programa académico: " + integrante[2] + "\n");
+                writer.write("Semestre actual: " + integrante[3] + "\n");
+                writer.write("Algo extraño que te gusta hacer: " + integrante[4] + "\n");
+                writer.write("Color favorito: " + integrante[5] + "\n");
+                writer.write("¿Tienes mascotas? (¿cuáles?): " + integrante[6] + "\n");
+                writer.write("Intereses en el desarrollo de software: " + integrante[7] + "\n");
+
+                System.out.println("Archivo creado: " + nombreArchivo);
+            } catch (IOException e) {
+                System.out.println("Error al crear el archivo " + nombreArchivo);
+                e.printStackTrace();
+            }
+        }
+    }
+}
