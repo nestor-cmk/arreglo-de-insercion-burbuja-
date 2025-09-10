@@ -1,0 +1,111 @@
+johan david balcazar ruiz
+408651
+johan.balcazar01@unicatolica.edu.co
+profe yo el codigo lo realice en python, en el video le digo el porque, porfavor espero y me entienda, gracias
+
+
+class Student:
+    def __init__(self, age, semester, socio_stratum, courses_completed, courses_pending, program, program_id):
+        self.age = age
+        self.semester = semester
+        self.socio_stratum = socio_stratum
+        self.courses_completed = courses_completed
+        self.courses_pending = courses_pending
+        self.program = program
+        self.program_id = program_id
+
+    def __str__(self):
+        return (f"ProgramID: {self.program_id}, Program: {self.program}, "
+                f"Age: {self.age}, Semester: {self.semester}, "
+                f"Stratum: {self.socio_stratum}, "
+                f"Courses Completed: {self.courses_completed}, "
+                f"Courses Pending: {self.courses_pending}")
+
+
+
+def insertion_sort(students, key=lambda x: x.age, reverse=False):
+    for i in range(1, len(students)):
+        current = students[i]
+        j = i - 1
+        while j >= 0 and ((key(students[j]) > key(current)) ^ reverse):
+            students[j + 1] = students[j]
+            j -= 1
+        students[j + 1] = current
+
+
+
+def bubble_sort(students, key=lambda x: x.age, reverse=False):
+    n = len(students)
+    for i in range(n):
+        for j in range(0, n - i - 1):
+            if (key(students[j]) > key(students[j + 1])) ^ reverse:
+                students[j], students[j + 1] = students[j + 1], students[j]
+
+
+def linear_search(students, program_id):
+    for s in students:
+        if s.program_id == program_id:
+            return s
+    return None
+
+
+def binary_search(students, age):
+    left, right = 0, len(students) - 1
+    while left <= right:
+        mid = (left + right) // 2
+        if students[mid].age == age:
+            return students[mid]
+        elif students[mid].age < age:
+            left = mid + 1
+        else:
+            right = mid - 1
+    return None
+
+
+if __name__ == "__main__":
+    students = [
+        Student(20, 3, 2, 15, 5, "Engineering", 101),
+        Student(22, 5, 3, 25, 3, "Medicine", 102),
+        Student(19, 2, 1, 10, 6, "Law", 103),
+        Student(24, 7, 4, 35, 2, "Architecture", 104),
+        Student(21, 4, 2, 20, 4, "Economics", 105),
+        Student(23, 6, 5, 30, 1, "Psychology", 106),
+        Student(18, 1, 1, 5, 7, "Philosophy", 107),
+        Student(26, 8, 6, 40, 2, "Engineering", 108),
+        Student(28, 9, 5, 45, 1, "Medicine", 109),
+        Student(30, 10, 4, 50, 0, "Law", 110),
+    ]
+
+    # Lista original
+    print("=== Original List of Students ===")
+    for s in students:
+        print(s)
+
+    # Insertion Sort por edad ascendente
+    print("\n=== Insertion Sort by Age (ascending) ===")
+    insertion_sort(students, key=lambda x: x.age, reverse=False)
+    for s in students:
+        print(s)
+
+    # Bubble Sort por semestre descendente
+    print("\n=== Bubble Sort by Semester (descending) ===")
+    bubble_sort(students, key=lambda x: x.semester, reverse=True)
+    for s in students:
+        print(s)
+
+    # Búsqueda lineal
+    print("\n=== Linear Search by ProgramID ===")
+    result = linear_search(students, 105)
+    if result:
+        print("Student found:", result)
+    else:
+        print("Student not found.")
+
+    # Búsqueda binaria (requiere ordenamiento previo por edad)
+    print("\n=== Binary Search by Age ===")
+    insertion_sort(students, key=lambda x: x.age, reverse=False)  # ordenar antes
+    result2 = binary_search(students, 24)
+    if result2:
+        print("Student found:", result2)
+    else:
+        print("Student not found.")
