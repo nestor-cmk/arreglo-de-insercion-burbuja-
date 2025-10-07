@@ -1,0 +1,245 @@
+import java.io.*;
+import java.util.*;
+import java.util.concurrent.*;
+
+public class SumasRapidas {
+
+    // ======= Clases para el ranking (lista doblemente enlazada) =======
+
+    static class Player implements Serializable {
+        String name;
+        int score;
+
+        Player(String name, int score) {
+            this.name = name;
+            this.score = score;
+        }
+
+        @Override
+        public String toString() {
+            return name + "," + score;
+        }
+
+        static Player fromString(String line) {
+            String[] parts = line.split(",");
+            if (parts.length != 2) return null;
+            try {
+                return new Player(parts[0], Integer.parseInt(parts[1]));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+    }
+
+    static class Node {
+        Player data;
+        Node prev, next;
+
+        Node(Player data) {
+            this.data = data;
+        }
+    }
+
+    static class DoublyLinkedList {
+        Node head;
+
+        // Inserta jugador ordenado por puntaje (descendente)
+        void insert(Player p) {
+            Node newNode = new Node(p);
+            if (head == null) {
+                head = newNode;
+                return;
+            }
+
+            Node current = head;
+            while (current != null && current.data.score >= p.score) {
+                if (current.next == null) break;
+                current = current.next;
+            }
+
+            if (current == head && p.score > current.data.score) {
+                newNode.next = head;
+                head.prev = newNode;
+                head = newNode;
+            } else if (current.next == null && p.score <= current.data.score) {
+                current.next = newNode;
+                newNode.prev = current;
+            } else if (current.data.score < p.score) {
+                Node prev = current.prev;
+                prev.next = newNode;
+                newNode.prev = prev;
+                newNode.next = current;
+                current.prev = newNode;
+            }
+        }
+
+        // Devuelve los 5 mejores jugadores
+        List<Player> getTop5() {
+            List<Player> top = new ArrayList<>();
+            Node temp = head;
+            int count = 0;
+            while (temp != null && count < 5) {
+                top.add(temp.data);
+                temp = temp.next;
+                count++;
+            }
+            return top;
+        }
+
+        void printRanking() {
+            System.out.println("\n--- RANKING TOP 5 ---");
+            List<Player> top = getTop5();
+            if (top.isEmpty()) {
+                System.out.println("Aún no hay jugadores.");
+                return;
+            }
+            int pos = 1;
+            for (Player p : top) {
+                System.out.println(pos + ". " + p.name + " - " + p.score + " puntos");
+                pos++;
+            }
+        }
+    }
+
+    // ======= Variables del juego =======
+    static final String FILE_NAME = "ranking.txt";
+    static Scanner scanner = new Scanner(System.in);
+    static ExecutorService executor = Executors.newSingleThreadExecutor();
+    static Random random = new Random();
+    static DoublyLinkedList ranking = new DoublyLinkedList();
+
+    public static void main(String[] args) {
+        cargarRanking();
+
+        System.out.println("=== BIENVENIDO AL JUEGO SUMAS RÁPIDAS ===");
+
+        boolean continuar = true;
+        while (continuar) {
+            System.out.print("\nIngresa tu nombre de usuario: ");
+            String nombre = scanner.nextLine().trim();
+            if (nombre.isEmpty()) nombre = "Jugador";
+
+            int puntaje = jugar(nombre);
+            ranking.insert(new Player(nombre, puntaje));
+
+            guardarRanking();
+
+            System.out.println("\nTu puntaje final fue: " + puntaje + " puntos");
+            ranking.printRanking();
+
+            continuar = preguntarReinicio();
+        }
+
+        System.out.println("\nGracias por jugar. ¡Hasta pronto!");
+        executor.shutdownNow();
+    }
+
+    // ======= Lógica principal del juego =======
+    static int jugar(String nombre) {
+        int tiempo = 10; // segundos iniciales
+        int puntaje = 0;
+        int nivel = 1;
+        int aciertos = 0;
+
+        while (true) {
+            int a = random.nextInt(100);
+            int b = random.nextInt(100);
+            int resultado = a + b;
+
+            System.out.println("\nNivel " + nivel + " | Tiempo: " + tiempo + "s");
+            System.out.print("¿Cuánto es " + a + " + " + b + "? ");
+
+            String respuesta = leerConTiempo(tiempo);
+
+            if (respuesta == null) {
+                System.out.println("\n⏰ Se acabó el tiempo. Fin del juego.");
+                break;
+            }
+
+            int valor;
+            try {
+                valor = Integer.parseInt(respuesta.trim());
+            } catch (NumberFormatException e) {
+                System.out.println("\n❌ Valor inválido. Fin del juego.");
+                break;
+            }
+
+            if (valor != resultado) {
+                System.out.println("\n❌ Incorrecto. La respuesta era " + resultado + ".");
+                break;
+            }
+
+            // Respuesta correcta
+            puntaje += 100;
+            aciertos++;
+            System.out.println("✅ Correcto (+100 puntos). Puntaje actual: " + puntaje);
+
+            // Cada 5 aciertos -> sube nivel, -2 segundos
+            if (aciertos == 5) {
+                nivel++;
+                aciertos = 0;
+                tiempo = Math.max(1, tiempo - 2);
+                System.out.println("⬆️ ¡Subes al nivel " + nivel + "! Tiempo por operación: " + tiempo + "s");
+            }
+        }
+
+        return puntaje;
+    }
+
+    // ======= Método para leer entrada con tiempo límite =======
+    static String leerConTiempo(int segundos) {
+        Future<String> futuro = executor.submit(() -> {
+            try {
+                return scanner.nextLine();
+            } catch (NoSuchElementException e) {
+                return null;
+            }
+        });
+
+        try {
+            return futuro.get(segundos, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            futuro.cancel(true);
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // ======= Preguntar si quiere volver a jugar =======
+    static boolean preguntarReinicio() {
+        while (true) {
+            System.out.print("\n¿Deseas jugar otra vez? (S/N): ");
+            String respuesta = scanner.nextLine().trim().toLowerCase();
+            if (respuesta.equals("s")) return true;
+            if (respuesta.equals("n")) return false;
+            System.out.println("Por favor ingresa 'S' o 'N'.");
+        }
+    }
+
+    // ======= Guardar y cargar ranking desde archivo =======
+    static void guardarRanking() {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(FILE_NAME))) {
+            for (Player p : ranking.getTop5()) {
+                writer.println(p.toString());
+            }
+        } catch (IOException e) {
+            System.out.println("⚠️ No se pudo guardar el ranking.");
+        }
+    }
+
+    static void cargarRanking() {
+        File archivo = new File(FILE_NAME);
+        if (!archivo.exists()) return;
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(archivo))) {
+            String linea;
+            while ((linea = reader.readLine()) != null) {
+                Player p = Player.fromString(linea);
+                if (p != null) ranking.insert(p);
+            }
+        } catch (IOException e) {
+            System.out.println("⚠️ No se pudo leer el ranking.");
+        }
+    }
+}
