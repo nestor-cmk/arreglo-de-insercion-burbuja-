@@ -1,0 +1,69 @@
+# Programa que trabaja con un listado acotado del 1 al 5
+# e implementa pila y cola con sus operaciones básicas
+# además de funciones para pintarlas
+
+# ---------------- Pila ----------------
+class Pila:
+    def __init__(self):
+        self.elementos = []
+
+    def push(self, dato):
+        if 1 <= dato <= 5:
+            self.elementos.append(dato)
+        else:
+            print("Solo se permiten números del 1 al 5")
+
+    def pop(self):
+        if self.elementos:
+            return self.elementos.pop()
+        else:
+            print("La pila está vacía")
+
+    def pintar_pila(self):
+        print("Pila:")
+        if not self.elementos:
+            print("Vacía")
+        else:
+            for e in reversed(self.elementos):
+                print(f"| {e} |")
+            print("-----")
+
+
+# ---------------- Cola ----------------
+class Cola:
+    def __init__(self):
+        self.elementos = []
+
+    def encolar(self, dato):
+        if 1 <= dato <= 5:
+            self.elementos.append(dato)
+        else:
+            print("Solo se permiten números del 1 al 5")
+
+    def desencolar(self):
+        if self.elementos:
+            return self.elementos.pop(0)
+        else:
+            print("La cola está vacía")
+
+    def pintar_cola(self):
+        print("Cola:")
+        if not self.elementos:
+            print("Vacía")
+        else:
+            print(" ← ".join(str(e) for e in self.elementos))
+
+
+# ---------------- Programa principal ----------------
+pila = Pila()
+cola = Cola()
+
+# Insertar números del 1 al 5
+for i in range(1, 6):
+    pila.push(i)
+    cola.encolar(i)
+
+# Mostrar estructuras
+pila.pintar_pila()
+cola.pintar_cola()
+ 
