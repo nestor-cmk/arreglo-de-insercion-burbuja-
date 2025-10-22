@@ -1,0 +1,411 @@
+import java.io.*;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Main.java
+ * Un solo archivo que contiene:
+ * - Entidades: Student, Course, Enrollment
+ * - Persistencia simple basada en serialización a archivos (carpeta "data")
+ * - Servicio académico con lógica CRUD y matriculas
+ * - Interfaz de consola (menú) para interactuar
+ *
+ * Compilar:
+ *   javac Main.java
+ * Ejecutar:
+ *   java Main
+ */
+public class Main {
+    // -------------------- Entities --------------------
+    public static class Student implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private int studentId;
+        private String name;
+        private String email;
+        public Student() {}
+        public Student(int studentId, String name, String email) {
+            this.studentId = studentId; this.name = name; this.email = email;
+        }
+        public int getStudentId() { return studentId; }
+        public String getName() { return name; }
+        public String getEmail() { return email; }
+        public void setName(String name) { this.name = name; }
+        public void setEmail(String email) { this.email = email; }
+        @Override public String toString() { return "["+studentId+"] "+name+" <"+email+">"; }
+    }
+
+    public static class Course implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private int courseId;
+        private String title;
+        private int credits;
+        private int capacity;
+        public Course() {}
+        public Course(int courseId, String title, int credits, int capacity) {
+            this.courseId = courseId; this.title = title; this.credits = credits; this.capacity = capacity;
+        }
+        public int getCourseId() { return courseId; }
+        public String getTitle() { return title; }
+        public int getCredits() { return credits; }
+        public int getCapacity() { return capacity; }
+        public void setTitle(String t) { this.title = t; }
+        public void setCredits(int c) { this.credits = c; }
+        public void setCapacity(int c) { this.capacity = c; }
+        @Override public String toString() { return "["+courseId+"] "+title+" (cr:"+credits+", cap:"+capacity+")"; }
+    }
+
+    public static class Enrollment implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private int enrollmentId;
+        private int studentId;
+        private int courseId;
+        private LocalDate date;
+        public Enrollment() {}
+        public Enrollment(int enrollmentId, int studentId, int courseId, LocalDate date) {
+            this.enrollmentId = enrollmentId; this.studentId = studentId; this.courseId = courseId; this.date = date;
+        }
+        public int getEnrollmentId() { return enrollmentId; }
+        public int getStudentId() { return studentId; }
+        public int getCourseId() { return courseId; }
+        public LocalDate getDate() { return date; }
+        @Override public String toString() { return "["+enrollmentId+"] s:"+studentId+" c:"+courseId+" @"+date; }
+    }
+
+    // -------------------- Persistence --------------------
+    public static class Database {
+        private static final String DIR = "data";
+        private static final String STUDENT_FILE = DIR + "/students.dat";
+        private static final String COURSE_FILE = DIR + "/courses.dat";
+        private static final String ENROLL_FILE = DIR + "/enrollments.dat";
+
+        private Map<Integer, Student> students = new HashMap<>();
+        private Map<Integer, Course> courses = new HashMap<>();
+        private Map<Integer, Enrollment> enrollments = new HashMap<>();
+
+        public Database() {
+            loadAll();
+        }
+        @SuppressWarnings("unchecked")
+        private <T> Map<Integer, T> load(String filename) {
+            File f = new File(filename);
+            if (!f.exists()) return new HashMap<>();
+            try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(f))) {
+                Object o = in.readObject();
+                return (Map<Integer, T>) o;
+            } catch (Exception e) {
+                System.err.println("No se pudo leer " + filename + " -> " + e.getMessage());
+                return new HashMap<>();
+            }
+        }
+        private <T> void save(String filename, Map<Integer, T> data) {
+            File dir = new File(DIR);
+            if (!dir.exists()) dir.mkdirs();
+            try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename))) {
+                out.writeObject(data);
+            } catch (IOException e) {
+                System.err.println("Error guardando " + filename + ": " + e.getMessage());
+            }
+        }
+        public void loadAll() {
+            students = load(STUDENT_FILE);
+            courses = load(COURSE_FILE);
+            enrollments = load(ENROLL_FILE);
+        }
+        public void saveAll() {
+            save(STUDENT_FILE, students);
+            save(COURSE_FILE, courses);
+            save(ENROLL_FILE, enrollments);
+        }
+        // Student ops
+        public Map<Integer, Student> getStudents() { return students; }
+        public void addStudent(Student s) { students.put(s.getStudentId(), s); save(STUDENT_FILE, students); }
+        public void removeStudent(int id) { students.remove(id); save(STUDENT_FILE, students); }
+        public Student getStudent(int id) { return students.get(id); }
+        // Course ops
+        public Map<Integer, Course> getCourses() { return courses; }
+        public void addCourse(Course c) { courses.put(c.getCourseId(), c); save(COURSE_FILE, courses); }
+        public void removeCourse(int id) { courses.remove(id); save(COURSE_FILE, courses); }
+        public Course getCourse(int id) { return courses.get(id); }
+        // Enrollment ops
+        public Map<Integer, Enrollment> getEnrollments() { return enrollments; }
+        public void addEnrollment(Enrollment e) { enrollments.put(e.getEnrollmentId(), e); save(ENROLL_FILE, enrollments); }
+        public void removeEnrollment(int id) { enrollments.remove(id); save(ENROLL_FILE, enrollments); }
+        // id generators
+        public int nextStudentId() { return students.keySet().stream().mapToInt(Integer::intValue).max().orElse(0) + 1; }
+        public int nextCourseId() { return courses.keySet().stream().mapToInt(Integer::intValue).max().orElse(0) + 1; }
+        public int nextEnrollmentId() { return enrollments.keySet().stream().mapToInt(Integer::intValue).max().orElse(0) + 1; }
+    }
+
+    // -------------------- Service --------------------
+    public static class AcademicService {
+        private Database db;
+        public AcademicService(Database db) { this.db = db; }
+
+        // Students
+        public Student createStudent(String name, String email) {
+            int id = db.nextStudentId();
+            Student s = new Student(id, name, email);
+            db.addStudent(s);
+            return s;
+        }
+        public boolean updateStudent(int id, String name, String email) {
+            Student s = db.getStudent(id);
+            if (s == null) return false;
+            s.setName(name); s.setEmail(email);
+            db.addStudent(s);
+            return true;
+        }
+        public boolean deleteStudent(int id) {
+            // borrar matriculas relacionadas
+            List<Integer> toRemove = db.getEnrollments().values().stream()
+                    .filter(e -> e.getStudentId() == id)
+                    .map(Enrollment::getEnrollmentId).collect(Collectors.toList());
+            toRemove.forEach(db::removeEnrollment);
+            db.removeStudent(id);
+            return true;
+        }
+
+        // Courses
+        public Course createCourse(String title, int credits, int capacity) {
+            int id = db.nextCourseId();
+            Course c = new Course(id, title, credits, capacity);
+            db.addCourse(c);
+            return c;
+        }
+        public boolean updateCourse(int id, String title, int credits, int capacity) {
+            Course c = db.getCourse(id);
+            if (c == null) return false;
+            c.setTitle(title); c.setCredits(credits); c.setCapacity(capacity);
+            db.addCourse(c);
+            return true;
+        }
+        public boolean deleteCourse(int id) {
+            List<Integer> toRemove = db.getEnrollments().values().stream()
+                    .filter(e -> e.getCourseId() == id)
+                    .map(Enrollment::getEnrollmentId).collect(Collectors.toList());
+            toRemove.forEach(db::removeEnrollment);
+            db.removeCourse(id);
+            return true;
+        }
+
+        // Enrollment
+        public String enroll(int studentId, int courseId) {
+            Student s = db.getStudent(studentId);
+            Course c = db.getCourse(courseId);
+            if (s == null) return "Estudiante no existe.";
+            if (c == null) return "Curso no existe.";
+
+            boolean already = db.getEnrollments().values().stream()
+                    .anyMatch(e -> e.getStudentId() == studentId && e.getCourseId() == courseId);
+            if (already) return "Estudiante ya inscrito en este curso.";
+
+            long enrolledCount = db.getEnrollments().values().stream()
+                    .filter(e -> e.getCourseId() == courseId).count();
+            if (enrolledCount >= c.getCapacity()) return "Curso lleno.";
+
+            int id = db.nextEnrollmentId();
+            Enrollment e = new Enrollment(id, studentId, courseId, LocalDate.now());
+            db.addEnrollment(e);
+            return "Matrícula registrada (id=" + id + ").";
+        }
+
+        public String unenroll(int studentId, int courseId) {
+            Optional<Enrollment> found = db.getEnrollments().values().stream()
+                    .filter(e -> e.getStudentId() == studentId && e.getCourseId() == courseId)
+                    .findFirst();
+            if (found.isEmpty()) return "Matrícula no encontrada.";
+            db.removeEnrollment(found.get().getEnrollmentId());
+            return "Matrícula eliminada.";
+        }
+
+        // Reports
+        public List<Course> coursesOfStudent(int studentId) {
+            Set<Integer> courseIds = db.getEnrollments().values().stream()
+                    .filter(e -> e.getStudentId() == studentId).map(Enrollment::getCourseId)
+                    .collect(Collectors.toSet());
+            return courseIds.stream().map(db::getCourse).filter(Objects::nonNull).collect(Collectors.toList());
+        }
+        public List<Student> studentsOfCourse(int courseId) {
+            Set<Integer> studentIds = db.getEnrollments().values().stream()
+                    .filter(e -> e.getCourseId() == courseId).map(Enrollment::getStudentId)
+                    .collect(Collectors.toSet());
+            return studentIds.stream().map(db::getStudent).filter(Objects::nonNull).collect(Collectors.toList());
+        }
+    }
+
+    // -------------------- Console UI --------------------
+    private static final Scanner scanner = new Scanner(System.in);
+    private static final Database db = new Database();
+    private static final AcademicService service = new AcademicService(db);
+
+    public static void main(String[] args) {
+        System.out.println("=== Sistema de Gestión Académica (archivo único) ===");
+        boolean exit = false;
+        while (!exit) {
+            showMenu();
+            String opt = scanner.nextLine().trim();
+            switch (opt) {
+                case "1": createStudent(); break;
+                case "2": listStudents(); break;
+                case "3": updateStudent(); break;
+                case "4": deleteStudent(); break;
+                case "5": createCourse(); break;
+                case "6": listCourses(); break;
+                case "7": updateCourse(); break;
+                case "8": deleteCourse(); break;
+                case "9": enroll(); break;
+                case "10": unenroll(); break;
+                case "11": reportCoursesOfStudent(); break;
+                case "12": reportStudentsOfCourse(); break;
+                case "0":
+                    db.saveAll();
+                    System.out.println("Guardado. Saliendo...");
+                    exit = true;
+                    break;
+                default: System.out.println("Opción inválida."); break;
+            }
+        }
+    }
+
+    private static void showMenu() {
+        System.out.println("\nMenu:");
+        System.out.println("1) Crear estudiante");
+        System.out.println("2) Listar estudiantes");
+        System.out.println("3) Actualizar estudiante");
+        System.out.println("4) Eliminar estudiante");
+        System.out.println("5) Crear curso");
+        System.out.println("6) Listar cursos");
+        System.out.println("7) Actualizar curso");
+        System.out.println("8) Eliminar curso");
+        System.out.println("9) Inscribir estudiante a curso");
+        System.out.println("10) Desinscribir estudiante de curso");
+        System.out.println("11) Reporte: cursos por estudiante");
+        System.out.println("12) Reporte: estudiantes por curso");
+        System.out.println("0) Guardar y salir");
+        System.out.print("Seleccione: ");
+    }
+
+    // Handlers
+    private static void createStudent() {
+        System.out.print("Nombre: ");
+        String name = scanner.nextLine();
+        System.out.print("Email: ");
+        String email = scanner.nextLine();
+        Student s = service.createStudent(name, email);
+        System.out.println("Creado: " + s);
+    }
+
+    private static void listStudents() {
+        System.out.println("--- Estudiantes ---");
+        if (db.getStudents().isEmpty()) System.out.println("(sin estudiantes)");
+        db.getStudents().values().forEach(System.out::println);
+    }
+
+    private static void updateStudent() {
+        try {
+            System.out.print("ID estudiante: ");
+            int id = Integer.parseInt(scanner.nextLine());
+            System.out.print("Nuevo nombre: ");
+            String name = scanner.nextLine();
+            System.out.print("Nuevo email: ");
+            String email = scanner.nextLine();
+            if (service.updateStudent(id, name, email)) System.out.println("Actualizado.");
+            else System.out.println("Estudiante no encontrado.");
+        } catch (NumberFormatException e) { System.out.println("ID inválido."); }
+    }
+
+    private static void deleteStudent() {
+        try {
+            System.out.print("ID estudiante a eliminar: ");
+            int id = Integer.parseInt(scanner.nextLine());
+            service.deleteStudent(id);
+            System.out.println("Eliminado (si existía).");
+        } catch (NumberFormatException e) { System.out.println("ID inválido."); }
+    }
+
+    private static void createCourse() {
+        try {
+            System.out.print("Titulo del curso: ");
+            String title = scanner.nextLine();
+            System.out.print("Creditos (int): ");
+            int credits = Integer.parseInt(scanner.nextLine());
+            System.out.print("Capacidad (int): ");
+            int capacity = Integer.parseInt(scanner.nextLine());
+            Course c = service.createCourse(title, credits, capacity);
+            System.out.println("Creado: " + c);
+        } catch (NumberFormatException e) { System.out.println("Entrada inválida."); }
+    }
+
+    private static void listCourses() {
+        System.out.println("--- Cursos ---");
+        if (db.getCourses().isEmpty()) System.out.println("(sin cursos)");
+        db.getCourses().values().forEach(System.out::println);
+    }
+
+    private static void updateCourse() {
+        try {
+            System.out.print("ID curso: ");
+            int id = Integer.parseInt(scanner.nextLine());
+            System.out.print("Nuevo titulo: ");
+            String title = scanner.nextLine();
+            System.out.print("Nuevo creditos: ");
+            int credits = Integer.parseInt(scanner.nextLine());
+            System.out.print("Nueva capacidad: ");
+            int capacity = Integer.parseInt(scanner.nextLine());
+            if (service.updateCourse(id, title, credits, capacity)) System.out.println("Actualizado.");
+            else System.out.println("Curso no encontrado.");
+        } catch (NumberFormatException e) { System.out.println("Entrada inválida."); }
+    }
+
+    private static void deleteCourse() {
+        try {
+            System.out.print("ID curso a eliminar: ");
+            int id = Integer.parseInt(scanner.nextLine());
+            service.deleteCourse(id);
+            System.out.println("Eliminado (si existía).");
+        } catch (NumberFormatException e) { System.out.println("ID inválido."); }
+    }
+
+    private static void enroll() {
+        try {
+            System.out.print("ID estudiante: ");
+            int sId = Integer.parseInt(scanner.nextLine());
+            System.out.print("ID curso: ");
+            int cId = Integer.parseInt(scanner.nextLine());
+            System.out.println(service.enroll(sId, cId));
+        } catch (NumberFormatException e) { System.out.println("ID inválido."); }
+    }
+
+    private static void unenroll() {
+        try {
+            System.out.print("ID estudiante: ");
+            int sId = Integer.parseInt(scanner.nextLine());
+            System.out.print("ID curso: ");
+            int cId = Integer.parseInt(scanner.nextLine());
+            System.out.println(service.unenroll(sId, cId));
+        } catch (NumberFormatException e) { System.out.println("ID inválido."); }
+    }
+
+    private static void reportCoursesOfStudent() {
+        try {
+            System.out.print("ID estudiante: ");
+            int sId = Integer.parseInt(scanner.nextLine());
+            List<Course> courses = service.coursesOfStudent(sId);
+            System.out.println("Cursos inscritos:");
+            if (courses.isEmpty()) System.out.println("(ninguno)");
+            courses.forEach(System.out::println);
+        } catch (NumberFormatException e) { System.out.println("ID inválido."); }
+    }
+
+    private static void reportStudentsOfCourse() {
+        try {
+            System.out.print("ID curso: ");
+            int cId = Integer.parseInt(scanner.nextLine());
+            List<Student> students = service.studentsOfCourse(cId);
+            System.out.println("Estudiantes inscritos:");
+            if (students.isEmpty()) System.out.println("(ninguno)");
+            students.forEach(System.out::println);
+        } catch (NumberFormatException e) { System.out.println("ID inválido."); }
+    }
+}
